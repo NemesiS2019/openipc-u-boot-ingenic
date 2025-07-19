@@ -466,10 +466,10 @@ void phy_dqs_delay(int delay_l,int delay_h)
 void phy_calibration(int al8_1x,int ah8_1x,int al8_2x,int ah8_2x)
 {
 #if 1
-	printf("T31_0x5: %x\n",readl(PHY_BASE + 0x14));
-	printf("T31_0x15: %x\n",readl(PHY_BASE + 0x54));
-	printf("T31_0x4: %x\n",readl(PHY_BASE + 0x10));
-	printf("T31_0x14: %x\n",readl(PHY_BASE + 0x50));
+	printf("PHY_0x5: %x\n",readl(PHY_BASE + 0x14));
+	printf("PHY_0x15: %x\n",readl(PHY_BASE + 0x54));
+	printf("PHY_0x4: %x\n",readl(PHY_BASE + 0x10));
+	printf("PHY_0x14: %x\n",readl(PHY_BASE + 0x50));
 
 	int m=phy_readl(INNO_TRAINING_CTRL);
 	printf("INNO_TRAINING_CTRL 1: %x\n", phy_readl(INNO_TRAINING_CTRL));
@@ -477,13 +477,13 @@ void phy_calibration(int al8_1x,int ah8_1x,int al8_2x,int ah8_2x)
 	phy_writel(m,INNO_TRAINING_CTRL);
 	printf("INNO_TRAINING_CTRL 2: %x\n", phy_readl(INNO_TRAINING_CTRL));
 	while (0x3 != readl((PHY_BASE + 0xcc)));
-	printf("T31_cc: %x\n", readl((PHY_BASE + 0xcc)));
+	printf("PHY_cc: %x\n", readl((PHY_BASE + 0xcc)));
 	phy_writel(0xa0,INNO_TRAINING_CTRL);
 	printf("INNO_TRAINING_CTRL 3: %x\n", phy_readl(INNO_TRAINING_CTRL));
-	printf("T31_118: %x\n", readl((PHY_BASE + 0x118)));
-	printf("T31_158: %x\n", readl((PHY_BASE + 0x158)));
-	printf("T31_190: %x\n", readl((PHY_BASE + 0x190)));
-	printf("T31_194: %x\n", readl((PHY_BASE + 0x194)));
+	printf("PHY_118: %x\n", readl((PHY_BASE + 0x118)));
+	printf("PHY_158: %x\n", readl((PHY_BASE + 0x158)));
+	printf("PHY_190: %x\n", readl((PHY_BASE + 0x190)));
+	printf("PHY_194: %x\n", readl((PHY_BASE + 0x194)));
 #else
 	int m=phy_readl(INNO_TRAINING_CTRL);
 	m=(0x1<<1);
@@ -496,8 +496,8 @@ void phy_calibration(int al8_1x,int ah8_1x,int al8_2x,int ah8_2x)
 	//debug for t30
 	writel(30, T31_REG46);
 	writel(27, T31_REG56);
-	printf("T31_REG46: %x\n", readl(T31_REG46));
-	printf("T31_REG56: %x\n", readl(T31_REG56));
+	printf("PHY_REG46: %x\n", readl(T31_REG46));
+	printf("PHY_REG56: %x\n", readl(T31_REG56));
 #endif
 
 }

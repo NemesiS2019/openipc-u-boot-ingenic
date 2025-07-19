@@ -49,6 +49,8 @@
 #include "jz_gpio/t21_gpio.c"
 #elif defined (CONFIG_T31)
 #include "jz_gpio/t31_gpio.c"
+#elif defined (CONFIG_T23)
+#include "jz_gpio/t23_gpio.c"
 #endif
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -112,7 +114,7 @@ void gpio_set_driver_strength(enum gpio_port n, unsigned int pins, int ds)
 
 int gpio_request(unsigned gpio, const char *label)
 {
-	printf("%s[%s] = %d\n",__func__,label,gpio);
+	printf("%s label %s gpio = %d\n",__func__,label,gpio);
 	return gpio;
 }
 
@@ -343,6 +345,13 @@ void gpio_init(void)
 #ifdef CONFIG_JZ_PCA953X
 	pca953x_init();
 #endif
+#endif
+#ifdef CONFIG_T23
+	gpio_enable_pull_up(GPIO_PB(0));
+	gpio_enable_pull_up(GPIO_PB(1));
+	gpio_enable_pull_up(GPIO_PB(2));
+	gpio_enable_pull_up(GPIO_PB(3));
+	gpio_enable_pull_up(GPIO_PB(5));
 #endif
 }
 void dump_gpio_func( unsigned int gpio)

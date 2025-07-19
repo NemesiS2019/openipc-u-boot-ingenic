@@ -23,6 +23,8 @@
 #define CONFIG_SOC "t20"
 #elif defined(__CONFIG_ISVP_T21_H__)
 #define CONFIG_SOC "t21"
+#elif defined(__CONFIG_ISVP_T23_H__)
+#define CONFIG_SOC "t23"
 #elif defined(__CONFIG_ISVP_T30_H__)
 #define CONFIG_SOC "t30"
 #else

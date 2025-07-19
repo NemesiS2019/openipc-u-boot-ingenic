@@ -301,7 +301,7 @@ static int jz_mmc_core_init(struct mmc *mmc)
 
 	/* reset */
 	jz_mmc_writel(MSC_CTRL_RESET, priv, MSC_CTRL);
-#if defined(CONFIG_M200) || defined(CONFIG_T15) || defined(CONFIG_T10) || defined(CONFIG_T20) || defined(CONFIG_T21) || defined(CONFIG_T30) || defined(CONFIG_T31)
+#if defined(CONFIG_M200) || defined(CONFIG_T15) || defined(CONFIG_T10) || defined(CONFIG_T20) || defined(CONFIG_T21) || defined(CONFIG_T23) || defined(CONFIG_T30) || defined(CONFIG_T31)
 	tmp = jz_mmc_readl(priv, MSC_CTRL);
 	tmp &= ~MSC_CTRL_RESET;
 	jz_mmc_writel(tmp, priv, MSC_CTRL);
@@ -381,6 +381,9 @@ void jz_mmc_init(void)
 	int i = 0;
 
 #if defined(CONFIG_JZ_MMC_MSC0) && (!defined(CONFIG_SPL_BUILD) || (CONFIG_JZ_MMC_SPLMSC == 0))
+#ifdef CONFIG_T23
+	gpio_set_func(GPIO_PORT_B, GPIO_FUNC_0, 0x3 << 4 | 0xf << 0);
+#endif
 	jz_mmc_init_one(i++, 0, MSC0_BASE, MSC0);
 #endif
 #if defined(CONFIG_JZ_MMC_MSC1) && (!defined(CONFIG_SPL_BUILD) || (CONFIG_JZ_MMC_SPLMSC == 1))
