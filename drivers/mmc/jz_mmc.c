@@ -33,7 +33,6 @@ struct jz_mmc_priv {
 	int clk;
 };
 
-#define udelay(int) do{}while(0); //for decreasing time by ykliu
 /* jz_mmc_priv flags */
 #define JZ_MMC_BUS_WIDTH_MASK 0x3
 #define JZ_MMC_BUS_WIDTH_1    0x0
@@ -125,10 +124,17 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 
 	/* start the command (& the clock) */
 	jz_mmc_writel(MSC_CTRL_START_OP, priv, MSC_CTRL);
+	
+	/* Defensive timeout counter to prevent infinite hangs */
+	uint32_t cmd_timeout = 100000;
 
-	/* wait for completion */
-	while (!(stat = (jz_mmc_readl(priv, MSC_IFLG) & (MSC_IREG_END_CMD_RES | MSC_IREG_TIME_OUT_RES))))
-		udelay(10000);
+	/* wait for completion with microsecond increments */
+	while (!(stat = (jz_mmc_readl(priv, MSC_IFLG) & (MSC_IREG_END_CMD_RES | MSC_IREG_TIME_OUT_RES)))) {
+		if (--cmd_timeout == 0) {
+			return TIMEOUT;
+		}
+		udelay(1); /* Short 1-microsecond delay for hardware to respond */
+	}
 	jz_mmc_writel(stat, priv, MSC_IFLG);
 	if (stat & MSC_IREG_TIME_OUT_RES)
 		return TIMEOUT;
@@ -173,30 +179,44 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 		/* read the data */
 		int sz = data->blocks * data->blocksize;
 		void *buf = data->dest;
-		do {
+
+		/* Bounded loop to prevent FIFO race conditions on fast CPUs */
+		while (sz > 0) {
 			stat = jz_mmc_readl(priv, MSC_STAT);
 			if (stat & MSC_STAT_TIME_OUT_READ)
 				return TIMEOUT;
 			if (stat & MSC_STAT_CRC_READ_ERROR)
 				return COMM_ERR;
-			if (stat & MSC_STAT_DATA_FIFO_EMPTY) {
-				udelay(100);
-				continue;
-			}
-			do {
+
+			/* Read from FIFO only if it is explicitly NOT empty */
+			if (!(stat & MSC_STAT_DATA_FIFO_EMPTY)) {
 				uint32_t val = jz_mmc_readl(priv, MSC_RXFIFO);
-				if (sz == 1)
-					*(uint8_t *)buf = (uint8_t)val;
-				else if (sz == 2)
-					put_unaligned_le16(val, buf);
-				else if (sz >= 4)
+				if (sz >= 4) {
 					put_unaligned_le32(val, buf);
-				buf += 4;
-				sz -= 4;
-				stat = jz_mmc_readl(priv, MSC_STAT);
-			} while (!(stat & MSC_STAT_DATA_FIFO_EMPTY));
-		} while (!(stat & MSC_STAT_DATA_TRAN_DONE));
-		while (!(jz_mmc_readl(priv, MSC_IFLG) & MSC_IREG_DATA_TRAN_DONE));
+					buf += 4;
+					sz -= 4;
+				} else if (sz == 2) {
+					put_unaligned_le16(val, buf);
+					buf += 2;
+					sz -= 2;
+				} else if (sz == 1) {
+					*(uint8_t *)buf = (uint8_t)val;
+					buf += 1;
+					sz -= 1;
+				} else {
+					/* Safety fallback to prevent infinite loops */
+					break;
+				}
+			}
+		}
+
+		/* Wait for hardware transaction completion signal */
+		uint32_t tran_timeout = 100000;
+		while (!(jz_mmc_readl(priv, MSC_IFLG) & MSC_IREG_DATA_TRAN_DONE)) {
+			if (--tran_timeout == 0)
+				return TIMEOUT;
+			udelay(1);
+		}
 		jz_mmc_writel(MSC_IREG_DATA_TRAN_DONE, priv, MSC_IFLG);
 	}
 #else
@@ -312,8 +332,8 @@ static int jz_mmc_core_init(struct mmc *mmc)
 	/* enable low power mode */
 	jz_mmc_writel(0x1, priv, MSC_LPM);
 
-	/* maximum timeouts */
-//	jz_mmc_writel(0xffffffff, priv, MSC_RESTO); //use the default value for decreasing time by ykliu
+	/* Set maximum timeouts for both response and data lines to support SDHC/SDXC */
+	jz_mmc_writel(0xffffffff, priv, MSC_RESTO);
 	jz_mmc_writel(0xffffffff, priv, MSC_RDTO);
 
 	jz_mmc_writel(clkrt, priv, MSC_CLKRT);
@@ -327,9 +347,7 @@ static void jz_mmc_init_one(int idx, int controller, uintptr_t base, int clock)
 	struct jz_mmc_priv *priv = &mmc_priv[idx];
 
 	/* fill in the name */
-	strcpy(mmc->name, "msc");
-	mmc->name[10] = '0' + controller;
-	mmc->name[11] = 0;
+	snprintf(mmc->name, sizeof(mmc->name), "jz mmc slot %d", controller);
 
 	/* setup priv */
 	priv->base = base;
