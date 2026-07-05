@@ -148,13 +148,16 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 	/* start the command (& the clock) */
 	jz_mmc_writel(MSC_CTRL_START_OP, priv, MSC_CTRL);
 	
-		/* Spin aggressively without buggy udelay. 500k reads = ~10ms fallback */
-	uint32_t cmd_retries = 500000; 
+	/*  
+	 * 10000 iterations * 10us udelay = 100ms solid hardware timeout window.
+	 */
+	uint32_t cmd_retries = 10000; 
 	while (!(stat = (jz_mmc_readl(priv, MSC_IFLG) & (MSC_IREG_END_CMD_RES | MSC_IREG_TIME_OUT_RES)))) {
 		if (--cmd_retries == 0) {
-			priv->flags |= JZ_MMC_CARD_ABSENT;
+			/* Do NOT latch JZ_MMC_CARD_ABSENT here, let U-Boot core retry naturally */
 			return TIMEOUT;
 		}
+		udelay(10); /* Standard microsecond delay */
 	}
 	
 	jz_mmc_writel(stat, priv, MSC_IFLG);
@@ -181,14 +184,15 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 		}
 	}
 
-    /* Spin aggressively without buggy udelay. 500k reads = ~10ms fallback */
+    /* 20000 iterations * 10us udelay = 200ms solid hardware timeout window. */
 	if (cmd->resp_type == MMC_RSP_R1b) {
-		uint32_t r1b_retries = 500000;
+		uint32_t r1b_retries = 20000;
 		while (!(jz_mmc_readl(priv, MSC_STAT) & MSC_STAT_PRG_DONE)) {
 			if (--r1b_retries == 0) {
 				priv->flags |= JZ_MMC_CARD_ABSENT;
 				return TIMEOUT;
 			}
+			udelay(10);
 		}
 		jz_mmc_writel(MSC_IREG_PRG_DONE, priv, MSC_IFLG);
 	}
@@ -412,7 +416,7 @@ static void jz_mmc_init_one(int idx, int controller, uintptr_t base, int clock)
 	mmc->host_caps = MMC_MODE_4BIT | MMC_MODE_HC;
 #endif
 #else
-	mmc->f_max = 52000000;
+	mmc->f_max = 24000000;
 #ifndef CONFIG_FPGA
 #ifdef CONFIG_JZ_MMC_MSC0_PA_8BIT
 	mmc->host_caps = MMC_MODE_8BIT | MMC_MODE_HS_52MHz | MMC_MODE_HS | MMC_MODE_HC;
@@ -434,6 +438,15 @@ void jz_mmc_init(void)
 #if defined(CONFIG_JZ_MMC_MSC0) && (!defined(CONFIG_SPL_BUILD) || (CONFIG_JZ_MMC_SPLMSC == 0))
 #ifdef CONFIG_T23
 	gpio_set_func(GPIO_PORT_B, GPIO_FUNC_0, 0x3 << 4 | 0xf << 0);
+	
+	/* Pull-up for Data lines (D0 - D3) */
+	gpio_enable_pull_up(GPIO_PB(0));
+	gpio_enable_pull_up(GPIO_PB(1));
+	gpio_enable_pull_up(GPIO_PB(2));
+	gpio_enable_pull_up(GPIO_PB(3));
+	
+	/* Pull-up for Command line (CMD) */
+	gpio_enable_pull_up(GPIO_PB(5));
 #endif
 	jz_mmc_init_one(i++, 0, MSC0_BASE, MSC0);
 #endif
